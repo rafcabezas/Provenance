@@ -16,6 +16,7 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 
 @interface PVEmulatorCore()
 @property (nonatomic, assign) CGFloat framerateMultiplier;
+@property (nonatomic, strong) dispatch_queue_t frameRefreshGCDQueue;
 @end
 
 @implementation PVEmulatorCore
@@ -63,7 +64,11 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 			shouldStop = NO;
             framerateMultiplier = 1.0;
 			
-			[NSThread detachNewThreadSelector:@selector(frameRefreshThread:) toTarget:self withObject:nil];
+			//[NSThread detachNewThreadSelector:@selector(frameRefreshThread:) toTarget:self withObject:nil];
+            self.frameRefreshGCDQueue = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
+            dispatch_async(self.frameRefreshGCDQueue, ^{
+                [self frameRefresh];
+            });
 		}
 	}
 }
@@ -141,6 +146,36 @@ static NSTimeInterval defaultFrameInterval = 60.0;
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, 0);
         
         [self updateControllers];
+    }
+}
+
+- (void) frameRefresh {
+    
+    NSTimeInterval interval = 1.0 / ([self frameInterval] * framerateMultiplier);
+    
+    NSDate *start = [NSDate date];
+    [self executeFrame];
+    NSTimeInterval time = -[start timeIntervalSinceNow];
+    
+    NSTimeInterval timeLeft = interval - time;
+    
+    if (timeLeft < 0) {
+        dispatch_async(self.frameRefreshGCDQueue, ^{
+            [self updateControllers];
+            if (!shouldStop) {
+                [self frameRefresh];
+            }
+        });
+    }
+    else {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((interval - time) * NSEC_PER_SEC)), self.frameRefreshGCDQueue, ^{
+            [self updateControllers];
+            
+            if (!shouldStop) {
+                [self frameRefresh];
+            }
+            
+        });
     }
 }
 
