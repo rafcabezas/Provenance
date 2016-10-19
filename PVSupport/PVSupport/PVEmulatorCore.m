@@ -147,8 +147,8 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 
 - (void) frameRefreshSimple {
     
-    NSTimeInterval interval = 1.0 / ([self frameInterval] * framerateMultiplier);
-    OESetThreadRealtime(interval, 0.007, 0.03); // guessed from bsnes
+    gameInterval = 1.0 / ([self frameInterval] * framerateMultiplier);
+    OESetThreadRealtime(gameInterval, 0.007, 0.03); // guessed from bsnes
     
     while (!shouldStop) {
     
@@ -157,7 +157,7 @@ static NSTimeInterval defaultFrameInterval = 60.0;
         [self updateControllers];
         NSTimeInterval time = -[start timeIntervalSinceNow];
         
-        NSTimeInterval timeLeft = interval - time;
+        NSTimeInterval timeLeft = gameInterval - time;
 
         if (timeLeft > 0) {
             [NSThread sleepForTimeInterval:timeLeft];
