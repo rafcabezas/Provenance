@@ -115,9 +115,6 @@ NSString * const PVControllerManagerControllerReassignedNotification = @"PVContr
     self.iCadeController.controllerPressedAnyKey = ^(PViCadeController* controller) {
         weakSelf.iCadeController.controllerPressedAnyKey = nil;
         [weakSelf assignController:weakSelf.iCadeController];
-        
-        [[NSNotificationCenter defaultCenter] postNotificationName:GCControllerDidConnectNotification object:[[PVControllerManager sharedManager] iCadeController]];
-
     };
 }
 
