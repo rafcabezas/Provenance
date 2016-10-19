@@ -63,7 +63,8 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 			shouldStop = NO;
             framerateMultiplier = 1.0;
 			
-			[NSThread detachNewThreadSelector:@selector(frameRefreshThread:) toTarget:self withObject:nil];
+            //[NSThread detachNewThreadSelector:@selector(frameRefreshThread:) toTarget:self withObject:nil];
+            [NSThread detachNewThreadSelector:@selector(frameRefreshSimple) toTarget:self withObject:nil];
 		}
 	}
 }
@@ -143,6 +144,31 @@ static NSTimeInterval defaultFrameInterval = 60.0;
         [self updateControllers];
     }
 }
+
+- (void) frameRefreshSimple {
+    
+    NSTimeInterval interval = 1.0 / ([self frameInterval] * framerateMultiplier);
+    OESetThreadRealtime(interval, 0.007, 0.03); // guessed from bsnes
+    
+    while (!shouldStop) {
+    
+        NSDate *start = [NSDate date];
+        [self executeFrame];
+        [self updateControllers];
+        NSTimeInterval time = -[start timeIntervalSinceNow];
+        
+        NSTimeInterval timeLeft = interval - time;
+
+        if (timeLeft > 0) {
+            [NSThread sleepForTimeInterval:timeLeft];
+        }
+        
+        // Service the event loop
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, 0);
+    }
+}
+
+
 
 - (void)setGameSpeed:(GameSpeed)gameSpeed
 {
