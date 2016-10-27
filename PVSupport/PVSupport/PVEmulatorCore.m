@@ -108,7 +108,7 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 
     //Setup Initial timing
     NSDate *origin = [NSDate date];
-    NSTimeInterval sleepTime = 0;
+    NSTimeInterval sleepTime;
     NSTimeInterval nextEmuTick = GetTickCountSince(origin);
     
     //Emulation loop
@@ -121,6 +121,13 @@ static NSTimeInterval defaultFrameInterval = 60.0;
         sleepTime = nextEmuTick - GetTickCountSince(origin);
         if(sleepTime >= 0) {
             [NSThread sleepForTimeInterval:sleepTime];
+        }
+        else if (sleepTime < -3) {
+            //We're behind for more than 3seconds, this probably means the user
+            //left the app and came back later, or there was a time change
+            //Reset time
+            origin = [NSDate date];
+            nextEmuTick = GetTickCountSince(origin);
         }
     
     }
