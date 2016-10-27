@@ -26,7 +26,6 @@
 
 #import "PVGBAEmulatorCore.h"
 #import "OERingBuffer.h"
-#import "OETimingUtils.h"
 #import <OpenGLES/ES3/gl.h>
 #import <OpenGLES/ES3/glext.h>
 

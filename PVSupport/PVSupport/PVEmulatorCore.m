@@ -8,9 +8,9 @@
 
 #import "PVEmulatorCore.h"
 #import "NSObject+PVAbstractAdditions.h"
-#import <mach/mach_time.h>
-#import "OETimingUtils.h"
+#import "RealTimeThread.h"
 
+#define GetTickCountSince(x) (-[x timeIntervalSinceNow])
 static Class PVEmulatorCoreClass = Nil;
 static NSTimeInterval defaultFrameInterval = 60.0;
 
@@ -61,9 +61,9 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 		{
 			isRunning  = YES;
 			shouldStop = NO;
-            framerateMultiplier = 1.0;
+            self.gameSpeed = GameSpeedNormal;
 			
-			[NSThread detachNewThreadSelector:@selector(frameRefreshThread:) toTarget:self withObject:nil];
+            [NSThread detachNewThreadSelector:@selector(emulationLoopThread) toTarget:self withObject:nil];
 		}
 	}
 }
@@ -101,46 +101,28 @@ static NSTimeInterval defaultFrameInterval = 60.0;
     //subclasses may implement for polling
 }
 
-- (void)frameRefreshThread:(id)anArgument
-{
-    gameInterval = 1.0 / ([self frameInterval] * framerateMultiplier);
-    NSTimeInterval gameTime = OEMonotonicTime();
-    OESetThreadRealtime(gameInterval, 0.007, 0.03); // guessed from bsnes
+- (void) emulationLoopThread {
+    
+    //Become a real-time thread:
+    MakeCurrentThreadRealTime();
 
-    while (!shouldStop)
-    {
-        if (self.shouldResyncTime)
-        {
-            self.shouldResyncTime = NO;
-            gameTime = OEMonotonicTime();
-        }
-
-        gameTime += gameInterval;
-
-        @autoreleasepool
-        {
-            if (isRunning)
-            {
-				if (self.isSpeedModified)
-                {
-                    [self executeFrame];
-                }
-                else
-                {
-                    @synchronized(self)
-                    {
-                        [self executeFrame];
-                    }
-                }
-            }
-        }
-        
-        OEWaitUntil(gameTime);
-        
-        // Service the event loop
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, 0);
+    //Setup Initial timing
+    NSDate *origin = [NSDate date];
+    NSTimeInterval sleepTime = 0;
+    NSTimeInterval nextEmuTick = GetTickCountSince(origin);
+    
+    //Emulation loop
+    while (!shouldStop) {
         
         [self updateControllers];
+        [self executeFrame];
+
+        nextEmuTick += gameInterval;
+        sleepTime = nextEmuTick - GetTickCountSince(origin);
+        if(sleepTime >= 0) {
+            [NSThread sleepForTimeInterval:sleepTime];
+        }
+    
     }
 }
 
@@ -172,7 +154,6 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 
     NSLog(@"multiplier: %.1f", framerateMultiplier);
     gameInterval = 1.0 / ([self frameInterval] * framerateMultiplier);
-    OESetThreadRealtime(gameInterval, 0.007, 0.03); // guessed from bsnes
 }
 
 - (void)executeFrame
