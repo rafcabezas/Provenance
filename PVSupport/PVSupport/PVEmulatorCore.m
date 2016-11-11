@@ -15,7 +15,7 @@ static Class PVEmulatorCoreClass = Nil;
 static NSTimeInterval defaultFrameInterval = 60.0;
 
 @interface PVEmulatorCore()
-@property (nonatomic, assign) CGFloat framerateMultiplier;
+@property (nonatomic, assign) CGFloat  framerateMultiplier;
 @end
 
 @implementation PVEmulatorCore
@@ -34,6 +34,7 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 	{
 		NSUInteger count = [self audioBufferCount];
         ringBuffers = (__strong OERingBuffer **)calloc(count, sizeof(OERingBuffer *));
+        self.emulationLoopThreadLock = [NSLock new];
 	}
 	
 	return self;
@@ -94,6 +95,9 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 {
 	shouldStop = YES;
     isRunning  = NO;
+
+    [self.emulationLoopThreadLock lock]; // make sure emulator loop has ended
+    [self.emulationLoopThreadLock unlock];
 }
 
 - (void)updateControllers
@@ -103,22 +107,32 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 
 - (void) emulationLoopThread {
     
-    //Become a real-time thread:
-    MakeCurrentThreadRealTime();
+    // For FPS computation
+    int frameCount = 0;
+    NSDate *fpsCounter = [NSDate date];
 
     //Setup Initial timing
     NSDate *origin = [NSDate date];
     NSTimeInterval sleepTime;
-    NSTimeInterval nextEmuTick = GetTickCountSince(origin);
+    NSTimeInterval nextEmuTick = GetSecondsSince(origin);
     
+    [self.emulationLoopThreadLock lock];
+
+    //Become a real-time thread:
+    MakeCurrentThreadRealTime();
+
     //Emulation loop
     while (!shouldStop) {
         
         [self updateControllers];
-        [self executeFrame];
+        
+        @synchronized (self) {
+            [self executeFrame];
+        }
+        frameCount += 1;
 
         nextEmuTick += gameInterval;
-        sleepTime = nextEmuTick - GetTickCountSince(origin);
+        sleepTime = nextEmuTick - GetSecondsSince(origin);
         if(sleepTime >= 0) {
             [NSThread sleepForTimeInterval:sleepTime];
         }
@@ -127,10 +141,19 @@ static NSTimeInterval defaultFrameInterval = 60.0;
             //left the app and came back later, or there was a time change
             //Reset time
             origin = [NSDate date];
-            nextEmuTick = GetTickCountSince(origin);
+            nextEmuTick = GetSecondsSince(origin);
         }
-    
+        
+        // Compute FPS
+        NSTimeInterval timeSinceLastFPS = GetSecondsSince(fpsCounter);
+        if (timeSinceLastFPS >= 0.5) {
+            self.emulationFPS = (double)frameCount / timeSinceLastFPS;
+            frameCount = 0;
+            fpsCounter = [NSDate date];
+        }
     }
+    
+    [self.emulationLoopThreadLock unlock];
 }
 
 - (void)setGameSpeed:(GameSpeed)gameSpeed
