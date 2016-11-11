@@ -14,7 +14,7 @@ static Class PVEmulatorCoreClass = Nil;
 static NSTimeInterval defaultFrameInterval = 60.0;
 
 @interface PVEmulatorCore()
-@property (nonatomic, assign) CGFloat framerateMultiplier;
+@property (nonatomic, assign) CGFloat  framerateMultiplier;
 @end
 
 @implementation PVEmulatorCore
@@ -33,6 +33,7 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 	{
 		NSUInteger count = [self audioBufferCount];
         ringBuffers = (__strong OERingBuffer **)calloc(count, sizeof(OERingBuffer *));
+        self.emulationLoopThreadLock = [NSLock new];
 	}
 	
 	return self;
@@ -93,6 +94,9 @@ static NSTimeInterval defaultFrameInterval = 60.0;
 {
 	shouldStop = YES;
     isRunning  = NO;
+
+    [self.emulationLoopThreadLock lock]; // make sure emulator loop has ended
+    [self.emulationLoopThreadLock unlock];
 }
 
 - (void)updateControllers
@@ -106,25 +110,25 @@ static NSTimeInterval defaultFrameInterval = 60.0;
     int frameCount = 0;
     NSDate *fpsCounter = [NSDate date];
 
-    //Become a real-time thread:
-    MakeCurrentThreadRealTime();
-
     //Setup Initial timing
     NSDate *origin = [NSDate date];
     NSTimeInterval sleepTime;
     NSTimeInterval nextEmuTick = GetSecondsSince(origin);
+    
+    [self.emulationLoopThreadLock lock];
+
+    //Become a real-time thread:
+    MakeCurrentThreadRealTime();
 
     //Emulation loop
     while (!shouldStop) {
-
+        
         [self updateControllers];
+        
         @synchronized (self) {
             [self executeFrame];
         }
         frameCount += 1;
-        
-        [self updateControllers];
-        [self executeFrame];
 
         nextEmuTick += gameInterval;
         sleepTime = nextEmuTick - GetSecondsSince(origin);
@@ -138,7 +142,7 @@ static NSTimeInterval defaultFrameInterval = 60.0;
             origin = [NSDate date];
             nextEmuTick = GetSecondsSince(origin);
         }
-
+        
         // Compute FPS
         NSTimeInterval timeSinceLastFPS = GetSecondsSince(fpsCounter);
         if (timeSinceLastFPS >= 0.5) {
@@ -146,7 +150,10 @@ static NSTimeInterval defaultFrameInterval = 60.0;
             frameCount = 0;
             fpsCounter = [NSDate date];
         }
+
     }
+    
+    [self.emulationLoopThreadLock unlock];
 }
 
 - (void)setGameSpeed:(GameSpeed)gameSpeed
