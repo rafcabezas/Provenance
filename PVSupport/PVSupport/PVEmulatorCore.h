@@ -10,6 +10,8 @@
 #import "OERingBuffer.h"
 #import <GameController/GameController.h>
 
+#define GetSecondsSince(x) (-[x timeIntervalSinceNow])
+
 @interface PVEmulatorCore : NSObject {
 	
 	OERingBuffer __strong **ringBuffers;
@@ -25,6 +27,8 @@
     double framerateMultiplier;
 
 }
+
+@property (nonatomic, assign) double emulationFPS;
 
 @property (nonatomic, copy) NSString *romName;
 @property (nonatomic, copy) NSString *saveStatesPath;
