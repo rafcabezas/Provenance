@@ -10,7 +10,6 @@
 #import "NSObject+PVAbstractAdditions.h"
 #import "RealTimeThread.h"
 
-#define GetTickCountSince(x) (-[x timeIntervalSinceNow])
 static Class PVEmulatorCoreClass = Nil;
 static NSTimeInterval defaultFrameInterval = 60.0;
 
@@ -136,10 +135,9 @@ static NSTimeInterval defaultFrameInterval = 60.0;
         if(sleepTime >= 0) {
             [NSThread sleepForTimeInterval:sleepTime];
         }
-        else if (sleepTime < -3) {
-            //We're behind for more than 3seconds, this probably means the user
-            //left the app and came back later, or there was a time change
-            //Reset time
+        else {
+            // We're behind, we need to reset emulation time,
+            // otherwise emulation will "catch up" to real time
             origin = [NSDate date];
             nextEmuTick = GetSecondsSince(origin);
         }
