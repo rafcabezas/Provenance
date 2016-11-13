@@ -135,7 +135,7 @@ static NSTimeInterval defaultFrameInterval = 60.0;
         if(sleepTime >= 0) {
             [NSThread sleepForTimeInterval:sleepTime];
         }
-        else {
+        else if (sleepTime < -0.1) {
             // We're behind, we need to reset emulation time,
             // otherwise emulation will "catch up" to real time
             origin = [NSDate date];
